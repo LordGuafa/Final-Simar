@@ -96,35 +96,78 @@ class Piece:
 # Función para detectar y eliminar grupos
 def remove_matches(grid):
     matches = set()
-    
+
     for y in range(GRID_HEIGHT):
         for x in range(GRID_WIDTH):
             if grid[y][x] is not None:
                 color = grid[y][x]
-                group = find_group(grid, x, y, color)
-                if len(group) >= 3:
-                    matches.update(group)
+                horizontal = find_line(grid, x, y, color, (1, 0))
+                vertical = find_line(grid, x, y, color, (0, 1))
 
+                if len(horizontal) >= 3:
+                    if all(grid[y][px] == color for px, _ in horizontal):
+                        matches.update(horizontal)
+
+                if len(vertical) >= 3:
+                    if all(grid[py][x] == color for _, py in vertical):
+                        matches.update(vertical)
+
+    if len(matches) >= 3:
+        if len(matches) == 4:
+            return remove_with_neighbors(grid, matches)
+        elif len(matches) == 5:
+            return remove_color(grid, matches)
+        elif len(matches) >= 6:
+            return clear_grid(grid)
+        else:
+            return remove_blocks(grid, matches)
+
+    return False
+
+# Encontrar líneas horizontales o verticales de colores conectados
+def find_line(grid, x, y, color, direction):
+    dx, dy = direction
+    line = []
+
+    while 0 <= x < GRID_WIDTH and 0 <= y < GRID_HEIGHT and grid[y][x] == color:
+        line.append((x, y))
+        x += dx
+        y += dy
+
+    return line
+
+# Eliminar bloques normales
+def remove_blocks(grid, matches):
     for x, y in matches:
         grid[y][x] = None
+    return True
 
-    return len(matches) > 0
+# Eliminar bloques junto con los vecinos
+def remove_with_neighbors(grid, matches):
+    neighbors = set()
+    for x, y in matches:
+        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT:
+                neighbors.add((nx, ny))
+    matches.update(neighbors)
+    return remove_blocks(grid, matches)
 
-# Buscar grupos de colores conectados
-def find_group(grid, x, y, color):
-    stack = [(x, y)]
-    group = set()
+# Eliminar todos los bloques del mismo color
+def remove_color(grid, matches):
+    color = grid[next(iter(matches))[1]][next(iter(matches))[0]]
+    for y in range(GRID_HEIGHT):
+        for x in range(GRID_WIDTH):
+            if grid[y][x] == color:
+                grid[y][x] = None
+    return True
 
-    while stack:
-        cx, cy = stack.pop()
-        if (cx, cy) not in group and grid[cy][cx] == color:
-            group.add((cx, cy))
-            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                nx, ny = cx + dx, cy + dy
-                if 0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT:
-                    stack.append((nx, ny))
-
-    return group
+# Limpiar el tablero completo
+def clear_grid(grid):
+    for y in range(GRID_HEIGHT):
+        for x in range(GRID_WIDTH):
+            grid[y][x] = None
+    return True
 
 # Aplicar gravedad para llenar huecos
 def apply_gravity(grid):
@@ -221,7 +264,7 @@ def main():
 
         # Dibujar el puntaje
         score_text = font.render(f"Score: {score}", True, BLACK)
-        screen.blit(score_text, (WIDTH - 70, 10))
+        screen.blit(score_text, (WIDTH - 120, 10))
 
         # Actualizar la pantalla
         pygame.display.flip()
@@ -237,8 +280,6 @@ def main():
     screen.blit(final_score_text, (WIDTH // 2 - 50, HEIGHT // 2))
     pygame.display.flip()
     pygame.time.wait(3000)
-    pygame.quit()
-
 
 if __name__ == "__main__":
     main()
